@@ -41,6 +41,13 @@ export type Food = {
 // Invariant 9: Game State
 export type GameStatus = 'RUNNING' | 'PAUSED' | 'GAME_OVER';
 
+// High score record
+export interface HighScore {
+  score: number;
+  date: string;
+  length: number;  // Snake length when game ended
+}
+
 // Combined Game State representing all invariants
 export interface Model {
   // Invariant 1: Grid Structure
@@ -61,8 +68,14 @@ export interface Model {
   // Invariant 10: Score Progression
   score: number;
   
+  // High scores
+  highScores: HighScore[];
+  
   // Additional properties for game variations
   speed: number; // Affects Invariant 3: Snake Movement
+  minSpeed: number; // Minimum speed (slower)
+  maxSpeed: number; // Maximum speed (faster)
+  speedStep: number; // How much to change speed
   obstacles: Position[]; // For maze variations
   isPaused: boolean; // Detailed pause state
   
@@ -76,7 +89,8 @@ export type Msg =
   | { type: 'CHANGE_DIRECTION'; payload: Direction }
   | { type: 'MOVE_SNAKE' }
   | { type: 'TOGGLE_PAUSE' }
-  | { type: 'RESET_GAME' };
+  | { type: 'RESET_GAME' }
+  | { type: 'CHANGE_SPEED'; payload: 'UP' | 'DOWN' };
 
 // For collision checking (Invariant 8)
 export type CollisionResult = {
@@ -99,6 +113,17 @@ export type InitConfig = {
  * This ensures that all invariants are satisfied at the start of the game
  */
 export function init(config: InitConfig): Model {
+  // Load high scores from localStorage
+  let highScores: HighScore[] = [];
+  try {
+    const savedScores = localStorage.getItem('snakeHighScores');
+    if (savedScores) {
+      highScores = JSON.parse(savedScores);
+    }
+  } catch (error) {
+    console.error('Error loading high scores:', error);
+  }
+
   const { gridWidth, gridHeight, initialSnakeLength, hasWalls, speed, allowWrapping } = config;
   
   // Create empty grid cells (Invariant 1)
@@ -152,7 +177,11 @@ export function init(config: InitConfig): Model {
     },
     status: 'RUNNING', // Invariant 9
     score: 0, // Invariant 10
+    highScores, // Include loaded high scores
     speed,
+    minSpeed: 2, // Minimum 2 cells per second
+    maxSpeed: 15, // Maximum 15 cells per second
+    speedStep: 1, // Change speed by 1 cell per second
     obstacles: [], // No obstacles initially
     isPaused: false,
     hasWalls, // Invariant 11
@@ -161,28 +190,52 @@ export function init(config: InitConfig): Model {
 }
 
 /**
- * Find a random empty position on the grid
+ * Find a random empty position on the grid for food placement
  * Ensures food is placed in a valid location (Invariant 7)
  */
 export function getRandomEmptyPosition(cells: Cell[][], width: number, height: number): Position {
+  // Validate grid dimensions
+  if (width <= 0 || height <= 0 || cells.length !== height || cells[0].length !== width) {
+    console.error('Invalid grid dimensions:', { width, height, actualHeight: cells.length, actualWidth: cells[0]?.length });
+    throw new Error('Invalid grid dimensions for food placement');
+  }
+
   const emptyCells: Position[] = [];
   
-  // Find all empty cells
+  // Find all empty cells within grid boundaries
   for (let y = 0; y < height; y++) {
+    if (!cells[y]) continue; // Skip if row doesn't exist
     for (let x = 0; x < width; x++) {
+      if (!cells[y][x]) continue; // Skip if cell doesn't exist
       if (cells[y][x].content === 'EMPTY') {
-        emptyCells.push({ x, y });
+        // Validate position before adding
+        if (x >= 0 && x < width && y >= 0 && y < height) {
+          emptyCells.push({ x, y });
+        } else {
+          console.error('Invalid cell position:', { x, y, width, height });
+        }
       }
     }
   }
   
-  // Return a random empty cell
+  // Handle no empty cells
   if (emptyCells.length === 0) {
-    throw new Error('No empty cells available');
+    console.error('No empty cells available for food placement');
+    throw new Error('No empty cells available for food placement');
   }
   
+  // Get random empty cell
   const randomIndex = Math.floor(Math.random() * emptyCells.length);
-  return emptyCells[randomIndex];
+  const position = emptyCells[randomIndex];
+  
+  // Final boundary check
+  if (position.x < 0 || position.x >= width || position.y < 0 || position.y >= height) {
+    console.error('Selected position out of bounds:', position);
+    throw new Error('Food position out of bounds');
+  }
+  
+  console.log('Placing food at:', position);
+  return position;
 }
 
 /**
@@ -317,4 +370,36 @@ export function validateGameState(model: Model): boolean {
   
   // All invariants are satisfied
   return true;
+}
+
+/**
+ * Save a new high score
+ */
+export function saveHighScore(score: number, snakeLength: number): void {
+  try {
+    // Load existing scores
+    const savedScores = localStorage.getItem('snakeHighScores') || '[]';
+    const highScores: HighScore[] = JSON.parse(savedScores);
+    
+    // Add new score
+    const newScore: HighScore = {
+      score,
+      date: new Date().toLocaleDateString(),
+      length: snakeLength
+    };
+    
+    // Add to list and sort by score (descending)
+    highScores.push(newScore);
+    highScores.sort((a, b) => b.score - a.score);
+    
+    // Keep only top 5 scores
+    const topScores = highScores.slice(0, 5);
+    
+    // Save back to localStorage
+    localStorage.setItem('snakeHighScores', JSON.stringify(topScores));
+    
+    console.log('High scores updated:', topScores);
+  } catch (error) {
+    console.error('Error saving high score:', error);
+  }
 }

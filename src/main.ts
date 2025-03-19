@@ -1,7 +1,7 @@
-import { fromEvent, interval, merge, Subject, Observable } from 'rxjs';
-import { filter, map, scan, startWith, tap, throttleTime, catchError } from 'rxjs/operators';
+import { fromEvent, interval, merge, Subject, Observable, BehaviorSubject } from 'rxjs';
+import { filter, map, scan, startWith, tap, throttleTime, catchError, switchMap } from 'rxjs/operators';
 
-import { Msg, Direction, init, Model } from './model';
+import { Msg, init, Model } from './model';
 import { update } from './update';
 import { view } from './view';
 import { applyStyles } from './styles';
@@ -32,46 +32,52 @@ function main() {
   // Reset subject for handling game restarts
   const reset$ = new Subject<void>();
 
+  // Create a speed$ subject to handle speed changes
+  const speed$ = new BehaviorSubject<number>(gameConfig.speed);
+
   // Create a stream for keyboard events with throttling
   const keydown$ = fromEvent<KeyboardEvent>(document, 'keydown').pipe(
     throttleTime(50), // Prevent event queue overflow
-    filter(event => ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd', 'r', 'p'].includes(event.key)),
+    filter(event => ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd', 'r', 'p', 'u', 'd'].includes(event.key)),
     map(event => {
-      if (event.key === 'r') {
-        return { type: 'RESET_GAME' } as Msg;
-      }
-      
-      if (event.key === 'p') {
-        return { type: 'TOGGLE_PAUSE' } as Msg;
-      }
-      
-      let direction: Direction;
       switch (event.key) {
+        case 'r':
+          return { type: 'RESET_GAME' } as Msg;
+        
+        case 'p':
+          return { type: 'TOGGLE_PAUSE' } as Msg;
+        
+        case 'u':
+          return { type: 'CHANGE_SPEED', payload: 'UP' } as Msg;
+        
+        case 'd':
+          return { type: 'CHANGE_SPEED', payload: 'DOWN' } as Msg;
+        
         case 'ArrowUp':
         case 'w':
-          direction = 'UP';
-          break;
+          return { type: 'CHANGE_DIRECTION', payload: 'UP' } as Msg;
+        
         case 'ArrowDown':
         case 's':
-          direction = 'DOWN';
-          break;
+          return { type: 'CHANGE_DIRECTION', payload: 'DOWN' } as Msg;
+        
         case 'ArrowLeft':
         case 'a':
-          direction = 'LEFT';
-          break;
+          return { type: 'CHANGE_DIRECTION', payload: 'LEFT' } as Msg;
+        
         case 'ArrowRight':
         case 'd':
-          direction = 'RIGHT';
-          break;
+          return { type: 'CHANGE_DIRECTION', payload: 'RIGHT' } as Msg;
+        
         default:
-          direction = 'RIGHT';
+          return { type: 'CHANGE_DIRECTION', payload: 'RIGHT' } as Msg;
       }
-      return { type: 'CHANGE_DIRECTION', payload: direction } as Msg;
     })
   );
   
-  // Create a stream for the game clock
-  const tick$ = interval(1000 / gameConfig.speed).pipe(
+  // Create a stream for the game clock that responds to speed changes
+  const tick$ = speed$.pipe(
+    switchMap(speed => interval(1000 / speed)),
     map(() => ({ type: 'MOVE_SNAKE' } as Msg))
   );
   
@@ -92,6 +98,11 @@ function main() {
     startWith({ type: 'RESET_GAME' } as Msg),
     scan<Msg, Model>(update, initialModel),
     tap(model => {
+      // Update speed when it changes
+      if (speed$.value !== model.speed) {
+        speed$.next(model.speed);
+      }
+      
       // Render the view
       const gameElement = document.getElementById('game-container');
       if (gameElement) {
