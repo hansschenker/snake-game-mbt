@@ -1,5 +1,6 @@
 /**
  * Styles for the Snake Game
+ * This module contains styling code to make the game visually appealing
  */
 export const styles = `
   .snake-game {
@@ -29,45 +30,16 @@ export const styles = `
     margin-bottom: 20px;
   }
   
-  .row {
-    display: flex;
-  }
-  
   .cell {
     width: 20px;
     height: 20px;
     background-color: #f5f5f5;
   }
   
-  .snake_head {
-    background-color: #2c5530;
-    border-radius: 4px;
-    z-index: 2;
-    box-shadow: 0 0 2px rgba(0,0,0,0.3);
-  }
-  
-  .snake_body {
-    background-color: #4CAF50;
-    transition: all 0.1s linear;
-    border-radius: 4px;
-  }
-  
-  .food {
-    background-color: #f44336;
-    border-radius: 50%;
-    z-index: 1;
-    box-shadow: 0 0 4px rgba(244,67,54,0.5);
-    animation: pulse 1s infinite;
-  }
-  
   @keyframes pulse {
     0% { transform: scale(1); }
     50% { transform: scale(1.1); }
     100% { transform: scale(1); }
-  }
-  
-  .obstacle {
-    background-color: #8B4513;
   }
   
   .game-controls {
@@ -148,11 +120,6 @@ export const styles = `
     padding: 20px;
     border-radius: 8px;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    font-family: Arial, sans-serif;
-    max-width: 800px;
-    margin: 0 auto;
-    padding: 20px;
-    text-align: center;
   }
 
   #game-container > div:first-child {
@@ -175,72 +142,6 @@ export const styles = `
       linear-gradient(to bottom, rgba(0,0,0,0.05) 1px, transparent 1px);
     background-size: 20px 20px;
     pointer-events: none;
-  }
-
-  .high-scores {
-    margin: 20px auto;
-    max-width: 400px;
-  }
-
-  .high-scores table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 10px;
-  }
-
-  .high-scores th, .high-scores td {
-    padding: 8px;
-    border: 1px solid #ddd;
-  }
-
-  .high-scores th {
-    background-color: #f5f5f5;
-  }
-
-  .high-scores tr:nth-child(1) {
-    background-color: #fff9c4;
-  }
-
-  .controls-help {
-    margin: 20px auto;
-    padding: 15px;
-    background-color: #f5f5f5;
-    border-radius: 4px;
-    max-width: 300px;
-  }
-
-  .controls-help h3 {
-    margin-top: 0;
-  }
-
-  .controls-help p {
-    margin: 5px 0;
-  }
-
-  .game-over, .pause-overlay {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background-color: rgba(0,0,0,0.8);
-    color: white;
-    padding: 20px 40px;
-    border-radius: 8px;
-    text-align: center;
-  }
-
-  .score-display {
-    margin-bottom: 15px;
-  }
-
-  .score-display h2 {
-    margin: 0;
-    color: #2c5530;
-  }
-
-  .score-display p {
-    margin: 5px 0;
-    color: #666;
   }
 `;
 
