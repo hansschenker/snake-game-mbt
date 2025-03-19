@@ -1,4 +1,4 @@
-// Type definitions for the Snake Game Model
+// Improved Type definitions for the Snake Game Model
 
 // Invariant 1: Grid Structure
 export type GridDimensions = {
@@ -9,20 +9,52 @@ export type GridDimensions = {
 // Invariant 12: Movement Direction
 export type Direction = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT';
 
+export type Speed = -1 | 1 | 2 | 3 | 4 | 5;
+
 // Invariant 14: Segment Location Uniqueness
 export type Position = {
   x: number;
   y: number;
 };
 
-// Helper type for comparisons
-export type EntityId = 'SNAKE_HEAD' | 'SNAKE_BODY' | 'FOOD' | 'OBSTACLE' | 'EMPTY';
+// Define distinct entity types instead of a union
+// export type Empty = {
+//   kind: 'EMPTY';
+//   position: Position;
+// };
 
-// Invariant 14: Segment Location Uniqueness
-export type Cell = {
+// export type Head = {
+//   kind: 'HEAD';
+//   position: Position;
+// };
+
+// export type Body = {
+//   kind: 'BODY';
+//   position: Position;
+// };
+
+// export type Food = {
+//   kind: 'FOOD';
+//   position: Position;
+//   value: number;
+// };
+
+export type Content = 'EMPTY' | 'HEAD' | 'BODY' | 'FOOD' | 'OBSTACLE'
+
+// export type Obstacle = {
+//   type: 'OBSTACLE';
+//   position: Position;
+// };
+
+// A cell can contain one of these entity types
+// export type Cell = EmptyCell | Head | Body | Food | Obstacle;
+export interface Cell {
+  content: Content
   position: Position;
-  content: EntityId;
-};
+  // type?: 'EMPTY' | 'HEAD' | 'BODY' | 'FOOD' | 'OBSTACLE';
+}
+
+export type Collision = 'NONE' | 'WALL' | 'BODY' | 'FOOD' | 'OBSTACLE'| 'SELF';
 
 // Invariant 2 & 13 & 15: Snake Continuity, Head-Body Relationship, Head Uniqueness
 export type Snake = {
@@ -32,24 +64,21 @@ export type Snake = {
   growing: boolean; // Flag to indicate if snake is currently growing after eating
 };
 
-// Invariant 6 & 7: Food Existence and Placement
-export type Food = {
-  position: Position;
-  value: number; // Score value of the food
-};
-
 // Invariant 9: Game State
 export type GameStatus = 'RUNNING' | 'PAUSED' | 'GAME_OVER';
 
-// High score record
-export interface HighScore {
-  score: number;
-  date: string;
-  length: number;  // Snake length when game ended
-}
+// For collision checking (Invariant 8)
+export type CollisionResult = {
+  hasCollision: boolean;
+  collisionType: Collision;
+};
 
 // Combined Game State representing all invariants
 export interface Model {
+  // maxSpeed(arg0: number, maxSpeed: any): unknown;
+  // minSpeed(arg0: number, minSpeed: any): unknown;
+  // hasWalls: any;
+  speedStep: number;
   // Invariant 1: Grid Structure
   grid: {
     dimensions: GridDimensions;
@@ -60,7 +89,7 @@ export interface Model {
   snake: Snake;
   
   // Invariant 6, 7: Food Existence and Placement
-  food: Food;
+  food: Cell;
   
   // Invariant 9: Game State
   status: GameStatus;
@@ -68,42 +97,30 @@ export interface Model {
   // Invariant 10: Score Progression
   score: number;
   
-  // High scores
-  highScores: HighScore[];
-  
   // Additional properties for game variations
   speed: number; // Affects Invariant 3: Snake Movement
-  minSpeed: number; // Minimum speed (slower)
-  maxSpeed: number; // Maximum speed (faster)
-  speedStep: number; // How much to change speed
   obstacles: Position[]; // For maze variations
   isPaused: boolean; // Detailed pause state
   
   // For special variations
-  hasWalls: boolean; // Invariant 11: Boundary Enforcement
+  // hasWalls: boolean; // Invariant 11: Boundary Enforcement
   allowWrapping: boolean; // Negation of Invariant 11 for wrapping mode
 }
 
 // Messages that can be dispatched to update the model
 export type Msg = 
   | { type: 'CHANGE_DIRECTION'; payload: Direction }
+  | { type: 'CHANGE_SPEED'; payload: Speed }
   | { type: 'MOVE_SNAKE' }
   | { type: 'TOGGLE_PAUSE' }
-  | { type: 'RESET_GAME' }
-  | { type: 'CHANGE_SPEED'; payload: 'UP' | 'DOWN' };
-
-// For collision checking (Invariant 8)
-export type CollisionResult = {
-  hasCollision: boolean;
-  collisionType: 'NONE' | 'WALL' | 'SELF' | 'FOOD' | 'OBSTACLE';
-};
+  | { type: 'RESET_GAME' };
 
 // Model initialization configuration
 export type InitConfig = {
   gridWidth: number;
   gridHeight: number;
   initialSnakeLength: number;
-  hasWalls: boolean;
+  // hasWalls: boolean;
   speed: number;
   allowWrapping: boolean;
 };
@@ -113,24 +130,13 @@ export type InitConfig = {
  * This ensures that all invariants are satisfied at the start of the game
  */
 export function init(config: InitConfig): Model {
-  // Load high scores from localStorage
-  let highScores: HighScore[] = [];
-  try {
-    const savedScores = localStorage.getItem('snakeHighScores');
-    if (savedScores) {
-      highScores = JSON.parse(savedScores);
-    }
-  } catch (error) {
-    console.error('Error loading high scores:', error);
-  }
-
-  const { gridWidth, gridHeight, initialSnakeLength, hasWalls, speed, allowWrapping } = config;
+  const { gridWidth, gridHeight, initialSnakeLength,  allowWrapping } = config;
   
   // Create empty grid cells (Invariant 1)
   const cells: Cell[][] = Array(gridHeight).fill(null).map((_, y) => 
     Array(gridWidth).fill(null).map((_, x) => ({
-      position: { x, y },
-      content: 'EMPTY'
+      content: 'EMPTY',
+      position: { x, y }
     }))
   );
   
@@ -145,10 +151,17 @@ export function init(config: InitConfig): Model {
   }
   
   // Set snake elements in the grid
-  cells[headY][headX].content = 'SNAKE_HEAD';
+  cells[headY][headX] = {
+    content: 'HEAD',
+    position: { x: headX, y: headY }
+  };
+  
   body.forEach(segment => {
     if (segment.y >= 0 && segment.y < gridHeight && segment.x >= 0 && segment.x < gridWidth) {
-      cells[segment.y][segment.x].content = 'SNAKE_BODY';
+      cells[segment.y][segment.x] = {
+        content: 'BODY',
+        position: segment
+      };
     }
   });
   
@@ -157,85 +170,65 @@ export function init(config: InitConfig): Model {
     head: { x: headX, y: headY },
     body,
     direction: 'LEFT', // Initial direction
-    growing: false
+    growing: false,
+    
   };
   
   // Place food in an empty cell (Invariants 6, 7)
   let foodPosition = getRandomEmptyPosition(cells, gridWidth, gridHeight);
-  cells[foodPosition.y][foodPosition.x].content = 'FOOD';
+  cells[foodPosition.y][foodPosition.x] = {
+    content: 'FOOD',
+    position: foodPosition,
+  };
   
   // Return complete initial state
   return {
+    // maxSpeed: 5,
+    // minSpeed: (arg0: number, minSpeed: 1) => { /* implementation */ },
+    //hasWalls: false, // or true based on your game logic
+    speedStep: 1,
     grid: {
       dimensions: { width: gridWidth, height: gridHeight },
       cells
     },
     snake,
     food: {
+      content: 'FOOD',
       position: foodPosition,
-      value: 1
     },
     status: 'RUNNING', // Invariant 9
     score: 0, // Invariant 10
-    highScores, // Include loaded high scores
-    speed,
-    minSpeed: 2, // Minimum 2 cells per second
-    maxSpeed: 15, // Maximum 15 cells per second
-    speedStep: 1, // Change speed by 1 cell per second
+    speed:1,
     obstacles: [], // No obstacles initially
     isPaused: false,
-    hasWalls, // Invariant 11
+    // hasWalls, // Invariant 11
     allowWrapping
   };
 }
 
 /**
- * Find a random empty position on the grid for food placement
+ * Find a random empty position on the grid
  * Ensures food is placed in a valid location (Invariant 7)
  */
 export function getRandomEmptyPosition(cells: Cell[][], width: number, height: number): Position {
-  // Validate grid dimensions
-  if (width <= 0 || height <= 0 || cells.length !== height || cells[0].length !== width) {
-    console.error('Invalid grid dimensions:', { width, height, actualHeight: cells.length, actualWidth: cells[0]?.length });
-    throw new Error('Invalid grid dimensions for food placement');
-  }
-
   const emptyCells: Position[] = [];
   
-  // Find all empty cells within grid boundaries
+  // Find all empty cells
   for (let y = 0; y < height; y++) {
-    if (!cells[y]) continue; // Skip if row doesn't exist
     for (let x = 0; x < width; x++) {
-      if (!cells[y][x]) continue; // Skip if cell doesn't exist
       if (cells[y][x].content === 'EMPTY') {
-        // Validate position before adding
-        if (x >= 0 && x < width && y >= 0 && y < height) {
-          emptyCells.push({ x, y });
-        } else {
-          console.error('Invalid cell position:', { x, y, width, height });
-        }
+        emptyCells.push({ x, y });
       }
     }
   }
   
-  // Handle no empty cells
+  // Return a random empty cell
   if (emptyCells.length === 0) {
-    console.error('No empty cells available for food placement');
-    throw new Error('No empty cells available for food placement');
+    throw new Error('No empty cells available');
   }
   
-  // Get random empty cell
   const randomIndex = Math.floor(Math.random() * emptyCells.length);
-  const position = emptyCells[randomIndex];
-  
-  // Final boundary check
-  if (position.x < 0 || position.x >= width || position.y < 0 || position.y >= height) {
-    console.error('Selected position out of bounds:', position);
-    throw new Error('Food position out of bounds');
-  }
-  
-  console.log('Placing food at:', position);
-  return position;
+  return emptyCells[randomIndex];
 }
 
 /**
@@ -263,143 +256,42 @@ export function validateGameState(model: Model): boolean {
     lastSegment = segment;
   }
   
-  // Invariant 3: Snake Movement (always in motion when game is running)
-  // This is enforced by the game loop, not directly by the state
+  // Check for head in the grid
+  const { x: headX, y: headY } = head;
+  const { width, height } = model.grid.dimensions;
   
-  // Invariant 4: Direction Consistency
-  // This is enforced in the CHANGE_DIRECTION action handler
-  
-  // Invariant 5: Snake Growth
-  // This is enforced in the MOVE_SNAKE action handler
-  
-  // Invariant 6: Food Existence
-  if (model.status === 'RUNNING' && (!model.food || !model.food.position)) {
-    console.error("Invariant 6 violated: No food on the grid");
-    return false;
-  }
-  
-  // Invariant 7: Food Placement
-  if (model.food) {
-    const { x, y } = model.food.position;
-    
-    // Food position is within grid bounds
-    if (x < 0 || x >= model.grid.dimensions.width || 
-        y < 0 || y >= model.grid.dimensions.height) {
-      console.error("Invariant 7 violated: Food outside grid boundaries");
-      return false;
-    }
-    
-    // Food not on snake
-    if ((x === head.x && y === head.y) || 
-        body.some(segment => segment.x === x && segment.y === y)) {
-      console.error("Invariant 7 violated: Food placed on snake");
-      return false;
-    }
-    
-    // Food not on obstacle
-    if (model.obstacles.some(obs => obs.x === x && obs.y === y)) {
-      console.error("Invariant 7 violated: Food placed on obstacle");
+  if (headX >= 0 && headX < width && headY >= 0 && headY < height) {
+    const cell = model.grid.cells[headY][headX];
+    if (cell.content !== 'HEAD') {
+      console.error("Invariant 15 violated: Head position doesn't match grid");
       return false;
     }
   }
   
-  // Invariant 8: Collision Detection
-  // Enforced by the MOVE_SNAKE action handler
+  // Check for unique segments
+  const positions = new Map<string, string>();
   
-  // Invariant 9: Game State
-  if (!['RUNNING', 'PAUSED', 'GAME_OVER'].includes(model.status)) {
-    console.error("Invariant 9 violated: Invalid game status");
-    return false;
-  }
+  // Add head position
+  positions.set(`${head.x},${head.y}`, 'HEAD');
   
-  // Invariant 10: Score Progression
-  // Enforced by the MOVE_SNAKE action handler
-  
-  // Invariant 11: Boundary Enforcement
-  // Enforced by the MOVE_SNAKE action handler
-  
-  // Invariant 12: Movement Direction
-  if (!['UP', 'DOWN', 'LEFT', 'RIGHT'].includes(model.snake.direction)) {
-    console.error("Invariant 12 violated: Invalid movement direction");
-    return false;
-  }
-  
-  // Invariant 13: Head-Body Relationship
-  // Checked as part of Snake Continuity (Invariant 2)
-  
-  // Invariant 14: Segment Location Uniqueness
-  // Check if multiple entities are in the same cell
-  const entityPositions = new Map<string, EntityId>();
-  
-  // Add snake head position
-  entityPositions.set(`${head.x},${head.y}`, 'SNAKE_HEAD');
-  
-  // Add snake body positions
+  // Add body positions
   for (const segment of body) {
     const key = `${segment.x},${segment.y}`;
-    if (entityPositions.has(key)) {
+    if (positions.has(key)) {
       console.error("Invariant 14 violated: Multiple entities in the same cell");
       return false;
     }
-    entityPositions.set(key, 'SNAKE_BODY');
+    positions.set(key, 'BODY');
   }
   
-  // Add food position
-  if (model.food) {
-    const { x, y } = model.food.position;
-    const key = `${x},${y}`;
-    if (entityPositions.has(key)) {
-      console.error("Invariant 14 violated: Food overlaps with another entity");
-      return false;
-    }
-    entityPositions.set(key, 'FOOD');
+  // Check food position
+  const { position: foodPos } = model.food;
+  const foodKey = `${foodPos.x},${foodPos.y}`;
+  if (positions.has(foodKey)) {
+    console.error("Invariant 7 violated: Food overlaps with another entity");
+    return false;
   }
-  
-  // Add obstacle positions
-  for (const obstacle of model.obstacles) {
-    const key = `${obstacle.x},${obstacle.y}`;
-    if (entityPositions.has(key)) {
-      console.error("Invariant 14 violated: Obstacle overlaps with another entity");
-      return false;
-    }
-    entityPositions.set(key, 'OBSTACLE');
-  }
-  
-  // Invariant 15: Snake Head Uniqueness
-  // This is enforced by the data structure (there is only one head property)
   
   // All invariants are satisfied
   return true;
-}
-
-/**
- * Save a new high score
- */
-export function saveHighScore(score: number, snakeLength: number): void {
-  try {
-    // Load existing scores
-    const savedScores = localStorage.getItem('snakeHighScores') || '[]';
-    const highScores: HighScore[] = JSON.parse(savedScores);
-    
-    // Add new score
-    const newScore: HighScore = {
-      score,
-      date: new Date().toLocaleDateString(),
-      length: snakeLength
-    };
-    
-    // Add to list and sort by score (descending)
-    highScores.push(newScore);
-    highScores.sort((a, b) => b.score - a.score);
-    
-    // Keep only top 5 scores
-    const topScores = highScores.slice(0, 5);
-    
-    // Save back to localStorage
-    localStorage.setItem('snakeHighScores', JSON.stringify(topScores));
-    
-    console.log('High scores updated:', topScores);
-  } catch (error) {
-    console.error('Error saving high score:', error);
-  }
 }

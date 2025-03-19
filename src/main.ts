@@ -14,7 +14,7 @@ const gameConfig = {
   gridHeight: 20,
   initialSnakeLength: 3,
   hasWalls: true,
-  speed: 5, // Cells per second
+  speed: 3, // Cells per second
   allowWrapping: false
 };
 
@@ -38,41 +38,37 @@ function main() {
   // Create a stream for keyboard events with throttling
   const keydown$ = fromEvent<KeyboardEvent>(document, 'keydown').pipe(
     throttleTime(50), // Prevent event queue overflow
-    filter(event => ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd', 'r', 'p', 'u', 'd'].includes(event.key)),
+    filter(event => ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'd', 'r', 'p', 'u', 'd'].includes(event.key)),
     map(event => {
       switch (event.key) {
         case 'r':
-          return { type: 'RESET_GAME' } as Msg;
-        
+          return { type: 'RESET_GAME' } as Msg;    
         case 'p':
           return { type: 'TOGGLE_PAUSE' } as Msg;
         
         case 'u':
-          return { type: 'CHANGE_SPEED', payload: 'UP' } as Msg;
+          return { type: 'CHANGE_SPEED', payload: +1 }  as Msg;
         
         case 'd':
-          return { type: 'CHANGE_SPEED', payload: 'DOWN' } as Msg;
+          return { type: 'CHANGE_SPEED', payload: -1 }  as Msg;
         
         case 'ArrowUp':
-        case 'w':
           return { type: 'CHANGE_DIRECTION', payload: 'UP' } as Msg;
         
         case 'ArrowDown':
-        case 's':
           return { type: 'CHANGE_DIRECTION', payload: 'DOWN' } as Msg;
         
         case 'ArrowLeft':
-        case 'a':
           return { type: 'CHANGE_DIRECTION', payload: 'LEFT' } as Msg;
         
         case 'ArrowRight':
-        case 'd':
           return { type: 'CHANGE_DIRECTION', payload: 'RIGHT' } as Msg;
         
         default:
-          return { type: 'CHANGE_DIRECTION', payload: 'RIGHT' } as Msg;
+          
       }
-    })
+    }),
+    filter((msg): msg is Msg => msg !== undefined)
   );
   
   // Create a stream for the game clock that responds to speed changes

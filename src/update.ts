@@ -1,7 +1,6 @@
 import { 
   Model, 
   Snake,
-  Food,
   Cell,
   Msg, 
   Position, 
@@ -9,7 +8,8 @@ import {
   Direction,
   init,
   getRandomEmptyPosition,
-  saveHighScore
+  Content,
+  // saveHighScore
 } from './model';
 
 /**
@@ -19,7 +19,7 @@ export function detectCollision(
   newHead: Position,
   snake: Snake,
   grid: { dimensions: { width: number, height: number }, cells: Cell[][] },
-  food: Food,
+  food: Cell,
   obstacles: Position[]
 ): CollisionResult {
   const { width, height } = grid.dimensions;
@@ -176,7 +176,7 @@ export function update(model: Model, msg: Msg): Model {
           collision.collisionType === 'OBSTACLE') {
         console.log('Game over due to collision:', collision.collisionType);
         // Save high score before updating model
-        saveHighScore(model.score, model.snake.body.length + 1);
+        // saveHighScore(model.score, model.snake.body.length + 1);
         
         newModel.status = 'GAME_OVER'; // Invariant 9
         return newModel;
@@ -207,25 +207,25 @@ export function update(model: Model, msg: Msg): Model {
       const { cells } = newModel.grid;
       for (let y = 0; y < cells.length; y++) {
         for (let x = 0; x < cells[y].length; x++) {
-          if (cells[y][x].content === 'SNAKE_HEAD' || cells[y][x].content === 'SNAKE_BODY') {
+          if (cells[y][x].content === "HEAD" || cells[y][x].content === "FOOD" || cells[y][x].content === "BODY") {
             cells[y][x].content = 'EMPTY';
           }
         }
       }
       
       // Place snake head on grid (Invariants 13, 14, 15)
-      cells[newHead.y][newHead.x].content = 'SNAKE_HEAD';
+      cells[newHead.y][newHead.x].content = 'HEAD';
       
       // Place snake body on grid (Invariants 2, 14)
       for (const segment of newSnake.body) {
-        cells[segment.y][segment.x].content = 'SNAKE_BODY';
+        cells[segment.y][segment.x].content = 'BODY';
       }
       
       // Handle food eating and placement (Invariants 6, 7)
       if (ateFood) {
         try {
           // Update score (Invariant 10)
-          newModel.score += newModel.food.value;
+          newModel.score += 1 //newModel.food.value;
           
           // Generate new food position
           const newFoodPosition = getRandomEmptyPosition(cells, model.grid.dimensions.width, model.grid.dimensions.height);
@@ -233,7 +233,8 @@ export function update(model: Model, msg: Msg): Model {
           // Update food
           newModel.food = {
             position: newFoodPosition,
-            value: 1
+            content: 'FOOD'
+            // value: 1
           };
           
           // Place new food on grid
@@ -258,11 +259,11 @@ export function update(model: Model, msg: Msg): Model {
         return model;
       }
 
-      const newSpeed = msg.payload === 'UP'
-        ? Math.min(model.speed + model.speedStep, model.maxSpeed)
-        : Math.max(model.speed - model.speedStep, model.minSpeed);
+      const newSpeed = msg.payload === 1
+        ? Math.min(model.speed + model.speedStep, 5)
+        : Math.max(model.speed - model.speedStep, 1);
 
-      console.log(`Speed ${msg.payload === 'UP' ? 'increased' : 'decreased'} to: ${newSpeed}`);
+      console.log(`Speed ${msg.payload === 1 ? 'increased' : 'decreased'} to: ${newSpeed}`);
       
       return {
         ...model,
@@ -281,7 +282,7 @@ export function update(model: Model, msg: Msg): Model {
         gridWidth: model.grid.dimensions.width,
         gridHeight: model.grid.dimensions.height,
         initialSnakeLength: 3,
-        hasWalls: model.hasWalls,
+        // hasWalls: model.hasWalls,
         speed: model.speed,
         allowWrapping: model.allowWrapping
       });

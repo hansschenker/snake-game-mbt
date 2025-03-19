@@ -66,32 +66,32 @@ export function view(model: Model): void {
     </div>
   `;
 
-  // Create high scores panel
-  const highScoresPanel = document.createElement('div');
-  highScoresPanel.className = 'high-scores';
-  highScoresPanel.innerHTML = `
-    <h3>High Scores</h3>
-    <table>
-      <thead>
-        <tr>
-          <th>Rank</th>
-          <th>Score</th>
-          <th>Length</th>
-          <th>Date</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${model.highScores.map((score, index) => `
-          <tr>
-            <td>#${index + 1}</td>
-            <td>${score.score}</td>
-            <td>${score.length}</td>
-            <td>${score.date}</td>
-          </tr>
-        `).join('')}
-      </tbody>
-    </table>
-  `;
+  // // Create high scores panel
+  // const highScoresPanel = document.createElement('div');
+  // highScoresPanel.className = 'high-scores';
+  // highScoresPanel.innerHTML = `
+  //   <h3>High Scores</h3>
+  //   <table>
+  //     <thead>
+  //       <tr>
+  //         <th>Rank</th>
+  //         <th>Score</th>
+  //         <th>Length</th>
+  //         <th>Date</th>
+  //       </tr>
+  //     </thead>
+  //     <tbody>
+  //       ${model.highScores.map((score, index) => `
+  //         <tr>
+  //           <td>#${index + 1}</td>
+  //           <td>${score.score}</td>
+  //           <td>${score.length}</td>
+  //           <td>${score.date}</td>
+  //         </tr>
+  //       `).join('')}
+  //     </tbody>
+  //   </table>
+  // `;
 
   // Create controls help
   const controlsHelp = document.createElement('div');
@@ -120,6 +120,6 @@ export function view(model: Model): void {
   // Append all elements
   container.appendChild(infoPanel);
   container.appendChild(gridElement);
-  container.appendChild(highScoresPanel);
+  // container.appendChild(highScoresPanel);
   container.appendChild(controlsHelp);
 }
