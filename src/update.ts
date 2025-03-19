@@ -1,31 +1,23 @@
 import { 
   Model, 
-  Snake,
-  Cell,
   Msg, 
   Position, 
   CollisionResult, 
   Direction,
   init,
-  getRandomEmptyPosition,
-  Content,
-  // saveHighScore
+  getRandomEmptyPosition
 } from './model';
 
 /**
- * Detect collisions between the snake and game elements
+ * Detect collision between snake head and other entities
+ * Implements Invariant 8: Collision Detection
  */
-export function detectCollision(
-  newHead: Position,
-  snake: Snake,
-  grid: { dimensions: { width: number, height: number }, cells: Cell[][] },
-  food: Cell,
-  obstacles: Position[]
-): CollisionResult {
+export function detectCollision(model: Model, newHead: Position): CollisionResult {
+  const { grid, snake, hasWalls } = model;
   const { width, height } = grid.dimensions;
   
-  // Check wall collision
-  if (newHead.x < 0 || newHead.x >= width || newHead.y < 0 || newHead.y >= height) {
+  // Check wall collision (Invariant 11) - only if walls are enabled
+  if (hasWalls && (newHead.x < 0 || newHead.x >= width || newHead.y < 0 || newHead.y >= height)) {
     console.log('Wall collision detected:', {
       position: newHead,
       bounds: { width, height }
@@ -33,30 +25,42 @@ export function detectCollision(
     return { hasCollision: true, collisionType: 'WALL' };
   }
   
-  // Check self collision
-  if (snake.body.some((segment: Position) => segment.x === newHead.x && segment.y === newHead.y)) {
-    console.log('Self collision detected:', {
-      head: newHead,
-      body: snake.body
-    });
-    return { hasCollision: true, collisionType: 'SELF' };
+  // Check if the new position is within bounds
+  if (newHead.y >= 0 && newHead.y < height && newHead.x >= 0 && newHead.x < width) {
+    // Get the cell at the new head position
+    const cellAtNewHead = grid.cells[newHead.y][newHead.x];
+    
+    // Check what type of entity is at that position
+    switch (cellAtNewHead.type) {
+      case 'BODY':
+        // Only return collision if it's not the tail that's moving
+        // This allows the snake to move forward properly
+        if (snake.body.length > 1) {
+          // Check if this is the last segment of the body (the tail)
+          const tailPos = snake.body[snake.body.length - 1];
+          
+          // If it's not the tail, it's a self collision
+          if (tailPos.x !== newHead.x || tailPos.y !== newHead.y) {
+            console.log('Self collision detected:', {
+              head: newHead,
+              body: snake.body
+            });
+            return { hasCollision: true, collisionType: 'BODY' };
+          }
+        }
+        break;
+        
+      case 'OBSTACLE':
+        console.log('Obstacle collision detected');
+        return { hasCollision: true, collisionType: 'OBSTACLE' };
+        
+      case 'FOOD':
+        console.log('Food collision detected');
+        return { hasCollision: true, collisionType: 'FOOD' };
+    }
   }
   
-  // Check food collision
-  if (food.position.x === newHead.x && food.position.y === newHead.y) {
-    console.log('Food collision detected');
-    return { hasCollision: true, collisionType: 'FOOD' };
-  }
-  
-  // Check obstacle collision
-  if (obstacles.some((obstacle: Position) => obstacle.x === newHead.x && obstacle.y === newHead.y)) {
-    console.log('Obstacle collision detected:', {
-      position: newHead,
-      obstacles
-    });
-    return { hasCollision: true, collisionType: 'OBSTACLE' };
-  }
-  
+  // No collision detected
   return { hasCollision: false, collisionType: 'NONE' };
 }
 
@@ -97,8 +101,6 @@ export function calculateNewHeadPosition(position: Position, direction: Directio
       break;
   }
   
-  // Debug new position
-  console.log('New head position:', newHead, 'Direction:', direction);
   return newHead;
 }
 
@@ -109,17 +111,16 @@ export function applyWrapping(position: Position, width: number, height: number)
   const wrappedPosition = { ...position };
   
   if (wrappedPosition.x < 0) wrappedPosition.x = width - 1;
-  if (wrappedPosition.x >= width) wrappedPosition.x = 0;
+  else if (wrappedPosition.x >= width) wrappedPosition.x = 0;
+  
   if (wrappedPosition.y < 0) wrappedPosition.y = height - 1;
-  if (wrappedPosition.y >= height) wrappedPosition.y = 0;
+  else if (wrappedPosition.y >= height) wrappedPosition.y = 0;
   
   return wrappedPosition;
 }
 
 /**
- * Update function for the MVU architecture
- * Takes the current model and a message, returns updated model
- * This is a pure function that enforces all invariants
+ * Update function for the MVU architecture with improved entity types
  */
 export function update(model: Model, msg: Msg): Model {
   // Create a deep copy to maintain immutability
@@ -151,124 +152,109 @@ export function update(model: Model, msg: Msg): Model {
         return model;
       }
       
-      // Invariant 3: Snake Movement
       // Calculate new head position based on current direction
       const { head, direction } = model.snake;
       let newHead = calculateNewHeadPosition(head, direction);
       
-      // Handle wrapping if allowed (affects Invariant 11)
+      // Handle wrapping if allowed
       if (model.allowWrapping) {
         const { width, height } = model.grid.dimensions;
         newHead = applyWrapping(newHead, width, height);
       }
       
-      // Detect collisions (Invariant 8)
-      const collision = detectCollision(
-        newHead,
-        model.snake,
-        model.grid,
-        model.food,
-        model.obstacles
-      );
+      // Detect collisions
+      const collision = detectCollision(model, newHead);
       
-      // Handle wall or self collision
-      if (collision.collisionType === 'WALL' || collision.collisionType === 'SELF' || 
+      // Handle wall, self, or obstacle collision
+      if (collision.collisionType === 'WALL' || 
+          collision.collisionType === 'BODY' || 
           collision.collisionType === 'OBSTACLE') {
         console.log('Game over due to collision:', collision.collisionType);
-        // Save high score before updating model
-        // saveHighScore(model.score, model.snake.body.length + 1);
-        
-        newModel.status = 'GAME_OVER'; // Invariant 9
+        newModel.status = 'GAME_OVER';
         return newModel;
       }
       
-      // Handle food collision (Invariants 5, 6, 7, 10)
+      // Handle food collision
       const ateFood = collision.collisionType === 'FOOD';
       
-      // Move snake (Invariants 2, 13, 15)
-      // Copy current head to beginning of body
-      const newBody = [head, ...model.snake.body];
+      // Move snake - prepare new body
+      const newBody = [...model.snake.body];
       
-      // If not growing, remove tail (Invariant 5)
+      // Add old head to body
+      newBody.unshift(head);
+      
+      // If not growing, remove tail
       if (!model.snake.growing && !ateFood) {
         newBody.pop();
       }
       
       // Update snake
-      const newSnake = {
+      newModel.snake = {
         ...newModel.snake,
         head: newHead,
         body: newBody,
-        growing: ateFood // Set growing flag if food eaten (Invariant 5)
+        growing: ateFood
       };
       
-      // Update grid cells (Invariant 14)
-      // Clear old snake positions
+      // Reset the grid cells
       const { cells } = newModel.grid;
-      for (let y = 0; y < cells.length; y++) {
-        for (let x = 0; x < cells[y].length; x++) {
-          if (cells[y][x].content === "HEAD" || cells[y][x].content === "FOOD" || cells[y][x].content === "BODY") {
-            cells[y][x].content = 'EMPTY';
+      const { width, height } = model.grid.dimensions;
+      
+      // First, set all cells where the snake was to empty
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          if (cells[y][x].type === 'HEAD' || cells[y][x].type === 'BODY') {
+            cells[y][x] = {
+              type: 'EMPTY',
+              position: { x, y }
+            };
           }
         }
       }
       
-      // Place snake head on grid (Invariants 13, 14, 15)
-      cells[newHead.y][newHead.x].content = 'HEAD';
-      
-      // Place snake body on grid (Invariants 2, 14)
-      for (const segment of newSnake.body) {
-        cells[segment.y][segment.x].content = 'BODY';
+      // Place snake head on grid
+      if (newHead.y >= 0 && newHead.y < height && newHead.x >= 0 && newHead.x < width) {
+        cells[newHead.y][newHead.x] = {
+          type: 'HEAD',
+          position: newHead
+        };
       }
       
-      // Handle food eating and placement (Invariants 6, 7)
-      if (ateFood) {
-        try {
-          // Update score (Invariant 10)
-          newModel.score += 1 //newModel.food.value;
-          
-          // Generate new food position
-          const newFoodPosition = getRandomEmptyPosition(cells, model.grid.dimensions.width, model.grid.dimensions.height);
-          
-          // Update food
-          newModel.food = {
-            position: newFoodPosition,
-            content: 'FOOD'
-            // value: 1
+      // Place snake body on grid
+      for (const segment of newBody) {
+        if (segment.y >= 0 && segment.y < height && segment.x >= 0 && segment.x < width) {
+          cells[segment.y][segment.x] = {
+            type: 'BODY',
+            position: segment
           };
-          
-          // Place new food on grid
-          cells[newFoodPosition.y][newFoodPosition.x].content = 'FOOD';
-        } catch (error) {
-          console.error('Error placing new food:', error);
-          // If we can't place food, just grow the snake and continue
-          newModel.snake = {
-            ...newSnake,
-            body: [...newSnake.body, newSnake.body[newSnake.body.length - 1]]
-          };
-          newModel.score += 1;
         }
       }
       
-      newModel.snake = newSnake;
-      return newModel;
-    }
-    
-    case 'CHANGE_SPEED': {
-      if (model.status !== 'RUNNING') {
-        return model;
+      // Handle food eating
+      if (ateFood) {
+        try {
+          // Update score
+          newModel.score += newModel.food.value;
+          
+          // Generate new food position
+          const newFoodPosition = getRandomEmptyPosition(cells, width, height);
+          
+          // Update food
+          newModel.food = {
+            type: 'FOOD',
+            position: newFoodPosition,
+            value: 1
+          };
+          
+          // Place new food on grid
+          cells[newFoodPosition.y][newFoodPosition.x] = { ...newModel.food };
+        } catch (error) {
+          console.error('Error placing new food:', error);
+          // Even if we can't place new food, game should continue
+        }
       }
-
-      const newSpeed = msg.payload === 1
-        ? Math.min(model.speed + model.speedStep, 5)
-        : Math.max(model.speed - model.speedStep, 1);
-
-      console.log(`Speed ${msg.payload === 1 ? 'increased' : 'decreased'} to: ${newSpeed}`);
       
-      return {
-        ...model,
-        speed: newSpeed
-      };
+      return newModel;
     }
     
     case 'TOGGLE_PAUSE': {
@@ -282,7 +268,7 @@ export function update(model: Model, msg: Msg): Model {
         gridWidth: model.grid.dimensions.width,
         gridHeight: model.grid.dimensions.height,
         initialSnakeLength: 3,
-        // hasWalls: model.hasWalls,
+        hasWalls: model.hasWalls,
         speed: model.speed,
         allowWrapping: model.allowWrapping
       });

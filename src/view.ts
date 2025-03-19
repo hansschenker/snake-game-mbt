@@ -1,125 +1,109 @@
 import { Model } from './model';
 
-export function view(model: Model): void {
-  const container = document.getElementById('game-container');
-  if (!container) return;
+/**
+ * Render the game state to the DOM
+ * This function takes the current model and updates the DOM to reflect it
+ */
+export function view(model: Model) {
+  const gameElement = document.getElementById('game-container');
+  if (!gameElement) return;
 
-  // Clear container
-  container.innerHTML = '';
+  // Clear the previous state
+  gameElement.innerHTML = '';
 
-  // Create game grid
+  // Create grid container with proper boundaries
   const gridElement = document.createElement('div');
   gridElement.style.position = 'relative';
   gridElement.style.width = `${model.grid.dimensions.width * 20}px`;
   gridElement.style.height = `${model.grid.dimensions.height * 20}px`;
   gridElement.style.border = '2px solid #333';
-  gridElement.style.margin = '20px auto';
   gridElement.style.backgroundColor = '#f0f0f0';
+  gameElement.appendChild(gridElement);
 
-  // Render snake head
-  const headElement = document.createElement('div');
-  headElement.className = 'snake_head';
-  headElement.style.position = 'absolute';
-  headElement.style.width = '18px';
-  headElement.style.height = '18px';
-  headElement.style.backgroundColor = 'darkgreen';
-  headElement.style.border = '1px solid black';
-  headElement.style.left = `${model.snake.head.x * 20}px`;
-  headElement.style.top = `${model.snake.head.y * 20}px`;
-  gridElement.appendChild(headElement);
-
-  // Render snake body
-  model.snake.body.forEach(segment => {
-    const segmentElement = document.createElement('div');
-    segmentElement.className = 'snake_body';
-    segmentElement.style.position = 'absolute';
-    segmentElement.style.width = '18px';
-    segmentElement.style.height = '18px';
-    segmentElement.style.backgroundColor = 'green';
-    segmentElement.style.border = '1px solid darkgreen';
-    segmentElement.style.left = `${segment.x * 20}px`;
-    segmentElement.style.top = `${segment.y * 20}px`;
-    gridElement.appendChild(segmentElement);
-  });
-
-  // Render food
-  const foodElement = document.createElement('div');
-  foodElement.className = 'food';
-  foodElement.style.position = 'absolute';
-  foodElement.style.width = '18px';
-  foodElement.style.height = '18px';
-  foodElement.style.backgroundColor = 'red';
-  foodElement.style.border = '1px solid darkred';
-  foodElement.style.borderRadius = '50%';
-  foodElement.style.left = `${model.food.position.x * 20}px`;
-  foodElement.style.top = `${model.food.position.y * 20}px`;
-  gridElement.appendChild(foodElement);
-
-  // Create game info panel
-  const infoPanel = document.createElement('div');
-  infoPanel.style.textAlign = 'center';
-  infoPanel.style.marginBottom = '20px';
-  infoPanel.innerHTML = `
-    <div class="score-display">
-      <h2>Score: ${model.score}</h2>
-      <p>Speed: ${model.speed}</p>
-    </div>
-  `;
-
-  // // Create high scores panel
-  // const highScoresPanel = document.createElement('div');
-  // highScoresPanel.className = 'high-scores';
-  // highScoresPanel.innerHTML = `
-  //   <h3>High Scores</h3>
-  //   <table>
-  //     <thead>
-  //       <tr>
-  //         <th>Rank</th>
-  //         <th>Score</th>
-  //         <th>Length</th>
-  //         <th>Date</th>
-  //       </tr>
-  //     </thead>
-  //     <tbody>
-  //       ${model.highScores.map((score, index) => `
-  //         <tr>
-  //           <td>#${index + 1}</td>
-  //           <td>${score.score}</td>
-  //           <td>${score.length}</td>
-  //           <td>${score.date}</td>
-  //         </tr>
-  //       `).join('')}
-  //     </tbody>
-  //   </table>
-  // `;
-
-  // Create controls help
-  const controlsHelp = document.createElement('div');
-  controlsHelp.className = 'controls-help';
-  controlsHelp.innerHTML = `
-    <h3>Controls</h3>
-    <p>Arrow Keys / WASD: Move</p>
-    <p>P: Pause</p>
-    <p>R: Restart</p>
-    <p>U/D: Speed Up/Down</p>
-  `;
-
-  // Add game status if needed
-  if (model.status === 'GAME_OVER') {
-    const gameOver = document.createElement('div');
-    gameOver.className = 'game-over';
-    gameOver.innerHTML = '<h2>Game Over!</h2><p>Press R to restart</p>';
-    container.appendChild(gameOver);
-  } else if (model.isPaused) {
-    const pauseOverlay = document.createElement('div');
-    pauseOverlay.className = 'pause-overlay';
-    pauseOverlay.innerHTML = '<h2>Paused</h2><p>Press P to resume</p>';
-    container.appendChild(pauseOverlay);
+  // Render all game entities by iterating through the grid
+  for (let y = 0; y < model.grid.dimensions.height; y++) {
+    for (let x = 0; x < model.grid.dimensions.width; x++) {
+      const cell = model.grid.cells[y][x];
+      
+      // Skip empty cells
+      if (cell.type === 'EMPTY') continue;
+      
+      // Create element for this entity
+      const entityElement = document.createElement('div');
+      entityElement.style.position = 'absolute';
+      entityElement.style.width = '18px';
+      entityElement.style.height = '18px';
+      entityElement.style.left = `${x * 20}px`;
+      entityElement.style.top = `${y * 20}px`;
+      
+      // Style based on entity type
+      switch (cell.type) {
+        case 'HEAD':
+          entityElement.style.backgroundColor = 'darkgreen';
+          entityElement.style.border = '1px solid black';
+          entityElement.style.zIndex = '2';
+          break;
+          
+        case 'BODY':
+          entityElement.style.backgroundColor = 'green';
+          entityElement.style.border = '1px solid darkgreen';
+          break;
+          
+        case 'FOOD':
+          entityElement.style.backgroundColor = 'red';
+          entityElement.style.border = '1px solid darkred';
+          entityElement.style.borderRadius = '50%';
+          break;
+          
+        case 'OBSTACLE':
+          entityElement.style.backgroundColor = 'brown';
+          entityElement.style.border = '1px solid #333';
+          break;
+      }
+      
+      gridElement.appendChild(entityElement);
+    }
   }
 
-  // Append all elements
-  container.appendChild(infoPanel);
-  container.appendChild(gridElement);
-  // container.appendChild(highScoresPanel);
-  container.appendChild(controlsHelp);
+  // Render score
+  const scoreElement = document.createElement('div');
+  scoreElement.style.marginTop = '10px';
+  scoreElement.style.fontSize = '20px';
+  scoreElement.textContent = `Score: ${model.score}`;
+  gameElement.appendChild(scoreElement);
+
+  // Show game over message
+  if (model.status === 'GAME_OVER') {
+    const gameOverElement = document.createElement('div');
+    gameOverElement.style.marginTop = '10px';
+    gameOverElement.style.color = 'red';
+    gameOverElement.style.fontSize = '24px';
+    gameOverElement.textContent = 'Game Over! Press R to restart';
+    gameElement.appendChild(gameOverElement);
+  }
+  
+  // Show pause message
+  if (model.status === 'PAUSED') {
+    const pauseElement = document.createElement('div');
+    pauseElement.style.position = 'absolute';
+    pauseElement.style.top = '50%';
+    pauseElement.style.left = '50%';
+    pauseElement.style.transform = 'translate(-50%, -50%)';
+    pauseElement.style.backgroundColor = 'rgba(0,0,0,0.7)';
+    pauseElement.style.color = 'white';
+    pauseElement.style.padding = '10px 20px';
+    pauseElement.style.borderRadius = '4px';
+    pauseElement.style.fontSize = '24px';
+    pauseElement.textContent = 'PAUSED';
+    gridElement.appendChild(pauseElement);
+  }
+  
+  // Add instructions
+  const instructionsElement = document.createElement('div');
+  instructionsElement.style.marginTop = '10px';
+  instructionsElement.style.fontSize = '14px';
+  instructionsElement.innerHTML = `
+    <p>Controls: Arrow keys or WASD to move | P to pause | R to restart</p>
+  `;
+  gameElement.appendChild(instructionsElement);
 }
